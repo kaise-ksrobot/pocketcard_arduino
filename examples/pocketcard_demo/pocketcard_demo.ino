@@ -6,15 +6,19 @@
   Adafruit invests time and resources providing this open source code, please support Adafruit and open-source hardware by purchasing products from Adafruit!
   Written by Limor Fried/Ladyada for Adafruit Industries, with contributions from the open source community. BSD license, check license.txt for more information All text above, and the splash screen below must be included in any redistribution. 
 *********/
-
+#include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <FunctionalInterrupt.h>
-#include <MPU9250_asukiaaa.h>
 #include <Adafruit_NeoPixel.h>
 #include <Tone32.h>
+
+
+#include <MPU9250_asukiaaa.h>
+#include <Adafruit_MSA301.h>
+#include <Adafruit_Sensor.h>
 
 
 #define SDA_PIN 21
@@ -27,6 +31,9 @@
 #define LED_PIN 12
 #define BUZZER_PIN  26
 #define BUZZER_CHANNEL 0
+
+#define MOTION_SENSOR_MPU9250 0xF1
+#define MOTION_SENSOR_MSA301 0xF2
 
 
 // Series resistor value
@@ -49,11 +56,18 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 
-Adafruit_NeoPixel pixels(1, LED_PIN, NEO_RGB + NEO_KHZ800);
+Adafruit_NeoPixel pixels(1, LED_PIN, NEO_RGB  +NEO_KHZ800);
+
+
 
 MPU9250_asukiaaa mySensor;
 float aX, aY, aZ, aSqrt, gX, gY, gZ, mDirection, mX, mY, mZ;
 
+Adafruit_MSA301 msa;
+
+
+int motion_sensor = 0 ;
+uint8_t sensorId;
 
 int Button_Flag = 0;
 int RGB_Flag = 0;
@@ -146,7 +160,22 @@ void testdrawstyles(void) {
   display.setTextSize(1);             // Normal 1:1 pixel scale
   display.setTextColor(WHITE);        // Draw white text
   display.setCursor(0,0);             // Start at top-left corner
-  display.println(F("Hello, world!"));
+  display.println(F("PocketCard HW Test"));
+  Serial.println("PocketCard HW Test");
+
+if(motion_sensor==MOTION_SENSOR_MSA301)
+{
+    display.println("MSA301");
+    Serial.println("MSA301");
+
+  
+}else if(motion_sensor==MOTION_SENSOR_MPU9250)
+{
+    display.println("MPU9250 SensorId: " + String(sensorId));
+    Serial.println("MPU9250 SensorId: " + String(sensorId));
+
+}
+
 
   display.display();
   
@@ -158,7 +187,7 @@ void setup() {
 
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
-    Serial.println(F("SSD1306 allocation failed"));
+    Serial.println("SSD1306 allocation failed");
     for(;;); // Don't proceed, loop forever
   }
 
@@ -171,13 +200,47 @@ void setup() {
   delay(2000);
 
 
+  if (! msa.begin()) {
+    //Serial.println("Failed to find MSA301 chip");
+        
+    #ifdef _ESP32_HAL_I2C_H_ // For ESP32
+      Wire.begin(SDA_PIN, SCL_PIN);
+      mySensor.setWire(&Wire);
+    #endif
+
+   
+      display.setCursor(0,16); 
+      if (mySensor.readId(&sensorId) == 0) {
+         motion_sensor=MOTION_SENSOR_MPU9250;
+  
+        mySensor.beginAccel();
+        mySensor.beginGyro();
+        mySensor.beginMag();
+
+        // You can set your own offset for mag values
+        // mySensor.magXOffset = -50;
+        // mySensor.magYOffset = -55;
+        // mySensor.magZOffset = -10;
+      } 
+ 
+    
+  }
+  else
+  {
+     motion_sensor=MOTION_SENSOR_MSA301;
+    
+  }
+  
+
+
+
   testdrawstyles();    // Draw 'stylized' characters
 
   tone(BUZZER_PIN, NOTE_C4, 500, BUZZER_CHANNEL);
   noTone(BUZZER_PIN, BUZZER_CHANNEL);
   tone(BUZZER_PIN, NOTE_D4, 500, BUZZER_CHANNEL);
   noTone(BUZZER_PIN, BUZZER_CHANNEL);
-  tone(BUZZER_PIN, NOTE_E4, 500, BUZZER_CHANNEL);
+  /*tone(BUZZER_PIN, NOTE_E4, 500, BUZZER_CHANNEL);
   noTone(BUZZER_PIN, BUZZER_CHANNEL);
   tone(BUZZER_PIN, NOTE_F4, 500, BUZZER_CHANNEL);
   noTone(BUZZER_PIN, BUZZER_CHANNEL);
@@ -186,26 +249,15 @@ void setup() {
   tone(BUZZER_PIN, NOTE_A4, 500, BUZZER_CHANNEL);
   noTone(BUZZER_PIN, BUZZER_CHANNEL);
   tone(BUZZER_PIN, NOTE_B4, 500, BUZZER_CHANNEL);
-  noTone(BUZZER_PIN, BUZZER_CHANNEL);
+  noTone(BUZZER_PIN, BUZZER_CHANNEL);*/
    
 
 
-  #ifdef _ESP32_HAL_I2C_H_ // For ESP32
-  Wire.begin(SDA_PIN, SCL_PIN);
-  mySensor.setWire(&Wire);
-  #endif
-
-  mySensor.beginAccel();
-  mySensor.beginGyro();
-  mySensor.beginMag();
-
-  // You can set your own offset for mag values
-  // mySensor.magXOffset = -50;
-  // mySensor.magYOffset = -55;
-  // mySensor.magZOffset = -10;
 
   pixels.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
   pixels.setBrightness(10); // Set BRIGHTNESS to about 1/5 (max = 255)
+
+  delay(1000);
 
 
 }
@@ -213,7 +265,10 @@ void setup() {
 void loop() {
   button1.checkPressed();
   button2.checkPressed();
+  
   pixels.clear(); 
+  
+  
 
   display.clearDisplay();
   display.setTextSize(1);             // Normal 1:1 pixel scale
@@ -227,20 +282,35 @@ void loop() {
     display.setCursor(0,0);             // Start at top-left corner
     display.print("LDR_A=");
     display.println(potValue);
+    Serial.print("LDR_A=");
+    Serial.println(potValue);
     potValue = analogRead(LDRB_IO);
     display.setCursor(0,8);
     display.print("LDR_B=");
     display.println(potValue);
+    Serial.print("LDR_B=");
+    Serial.println(potValue);
     display.setCursor(0,16);
     // Call the function to get the temperature in degrees celsius3
     int temp = getTemp();
     display.print("Temperature: ");
     display.print(temp);
     display.println("C");
-
+    Serial.print("Temperature: ");
+    Serial.print(temp);
+    Serial.println("C");
     
+    display.print("PSRAM:");
+    display.println(ESP.getPsramSize());
+    Serial.print("PSRAM:");
+    Serial.println(ESP.getPsramSize());
+    
+    Serial.println("");
+    pixels.clear(); 
+    pixels.show(); 
     switch(RGB_Flag){
       case 0:
+        
         pixels.setPixelColor(0, pixels.Color(255,0, 0));
         RGB_Flag++;
         break;
@@ -263,10 +333,27 @@ void loop() {
    else if(Button_Flag==2)
    {
       //display.println(F("BUTTON_B"));
-      
-  
-      
+         
       display.setCursor(0,0);
+  if(motion_sensor==MOTION_SENSOR_MSA301)
+  {
+      msa.read();      // get X Y and Z data at once
+      // Then print out the raw data
+
+      display.println("accelX: " + String(msa.x)+" ");
+      display.println("accelY: " + String(msa.y)+" ");
+      display.println("accelZ: " + String(msa.z)+" ");
+
+      Serial.println("accelX: " + String(msa.x)+" ");
+      Serial.println("accelY: " + String(msa.y)+" ");
+      Serial.println("accelZ: " + String(msa.z)+" ");
+      Serial.println("");
+
+       
+  }
+  else if(motion_sensor==MOTION_SENSOR_MPU9250)
+  {
+      
       if (mySensor.accelUpdate() == 0) {
         aX = mySensor.accelX();
         aY = mySensor.accelY();
@@ -276,9 +363,15 @@ void loop() {
         display.println("accelX: " + String(aX)+" ");
         display.println("accelY: " + String(aY)+" ");
         display.println("accelZ: " + String(aZ)+" ");
+
+        Serial.println("accelX: " + String(aX)+" ");
+        Serial.println("accelY: " + String(aY)+" ");
+        Serial.println("accelZ: " + String(aZ)+" ");
+        Serial.println("");
                
       } else {
         display.println("Cannod read accel values");
+        Serial.println("Cannod read accel values");
       }
       
       display.setCursor(0,24);
@@ -289,8 +382,14 @@ void loop() {
         display.println("gyroX: " + String(gX)+" ");
         display.println("gyroY: " + String(gY)+" ");
         display.println("gyroZ: " + String(gZ)+" ");
+
+        Serial.println("gyroX: " + String(gX)+" ");
+        Serial.println("gyroY: " + String(gY)+" ");
+        Serial.println("gyroZ: " + String(gZ)+" ");
+        Serial.println("");
       } else {
         display.println("Cannot read gyro values");
+        Serial.println("Cannot read gyro values");
       }
       display.setCursor(0,48);
       if (mySensor.magUpdate() == 0) {
@@ -301,19 +400,20 @@ void loop() {
         display.print("X: " + String(mX)+" ");
         display.println("Y: " + String(mY)+" ");
         display.println("Z: " + String(mZ)+" ");
+
+        Serial.println("X: " + String(mX)+" ");
+        Serial.println("Y: " + String(mY)+" ");
+        Serial.println("Z: " + String(mZ)+" ");
+        Serial.println("");
+        
         
       } else {
         display.println("Cannot read mag values");
+        Serial.println("Cannot read mag values");
       }
+   }
 
-      /*uint8_t sensorId;
-      display.setCursor(0,0); 
-      if (mySensor.readId(&sensorId) == 0) {
-        display.println("sensorId: " + String(sensorId));
-      } else {
-        display.println("Cannot read sensorId");
-      }*/
-      
+     
      
       
       delay(300);
