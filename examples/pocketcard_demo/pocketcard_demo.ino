@@ -343,11 +343,29 @@ void loop() {
       display.println("accelX: " + String(msa.x)+" ");
       display.println("accelY: " + String(msa.y)+" ");
       display.println("accelZ: " + String(msa.z)+" ");
+      display.println("");
 
       Serial.println("accelX: " + String(msa.x)+" ");
       Serial.println("accelY: " + String(msa.y)+" ");
       Serial.println("accelZ: " + String(msa.z)+" ");
       Serial.println("");
+     
+
+      /* Or....get a new sensor event, normalized */ 
+      sensors_event_t event; 
+      msa.getEvent(&event);
+  
+      /* Display the results (acceleration is measured in m/s^2) */
+      display.println("accelX: " + String(event.acceleration.x)+" ");
+      display.println("accelY: " + String(event.acceleration.y)+" ");
+      display.println("accelZ: " + String(event.acceleration.z)+" ");
+      display.println("");
+
+      Serial.println("accelX: " + String(event.acceleration.x)+" ");
+      Serial.println("accelY: " + String(event.acceleration.y)+" ");
+      Serial.println("accelZ: " + String(event.acceleration.z)+" ");
+      Serial.println("");
+   
 
        
   }
